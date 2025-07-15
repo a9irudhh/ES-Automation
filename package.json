@@ -1,0 +1,27 @@
+{
+  "name": "es-query",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "ES-Query/server.js",
+  "scripts": {
+    "dev": "nodemon ./server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.1692.0",
+    "aws4": "^1.13.2",
+    "axios": "^1.10.0",
+    "cors": "^2.8.5",
+    "date-fns": "^4.1.0",
+    "dotenv": "^17.2.0",
+    "elasticsearch": "^6.1.0",
+    "express": "^4.18.2",
+    "googleapis": "^152.0.0",
+    "http-aws-es": "^6.0.0",
+    "undici": "^7.11.0"
+  }
+}

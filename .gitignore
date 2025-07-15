@@ -1,0 +1,47 @@
+# Node.js dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# Credentials and sensitive files
+*.pem
+*.key
+*-credentials.json
+*-j3-*.json
+scientific-elf-465409-j3-0977bd58f665.json
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
