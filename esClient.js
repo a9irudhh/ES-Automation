@@ -1,6 +1,6 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
-console.log('Loaded ES_ENDPOINT:', process.env.ES_ENDPOINT);
+// console.log('Loaded ES_ENDPOINT:', process.env.ES_ENDPOINT);
 
 import AWS from 'aws-sdk';
 import axios from 'axios';
@@ -36,7 +36,7 @@ export async function searchTranscripts(env, fromDate, toDate) {
     query: {
       bool: {
         filter: [
-          { range: { uploaded_date: { gte: fromDate, lte: toDate } } }
+          { range: { processed_on: { gte: fromDate, lte: toDate } } }
         ]
       }
     }

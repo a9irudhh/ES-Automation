@@ -5,6 +5,6 @@ import { addToSheetsController } from '../controllers/addToSheets.controller.js'
 const router = express.Router();
 
 router.route('/search').get(searchController);
-router.route('/addToSheets').post(addToSheetsController);
+router.route('/addToSheets').get(addToSheetsController);
 
 export default router;
