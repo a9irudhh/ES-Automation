@@ -163,7 +163,7 @@ export async function addToSheetsController(req, res) {
 
         return [
           formattedDate,
-          h._source.image_name || '',
+          h._source.original_filename || '',
           h._source.request?.agent|| '',
           h._source.final_reviewer || '',
           h._source.processed_by  || '',
