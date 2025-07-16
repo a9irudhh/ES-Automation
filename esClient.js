@@ -10,7 +10,7 @@ AWS.config.update({ region: process.env.AWS_REGION });
 
 const esEndpoint = process.env.ES_ENDPOINT;
 
-function getAWSSignedRequest(method, path, body = undefined) {
+function getAWSSignedRequest(method, path, body = undefined, query = undefined) {
   const url = new URL(esEndpoint);
   const opts = {
     host: url.hostname,
@@ -21,6 +21,9 @@ function getAWSSignedRequest(method, path, body = undefined) {
     headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined
   };
+  if (query) {
+    opts.path += '?' + new URLSearchParams(query).toString();
+  }
   aws4.sign(opts, {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -32,7 +35,7 @@ function getAWSSignedRequest(method, path, body = undefined) {
 export async function searchTranscripts(env, fromDate, toDate) {
   const index = `${env}_sia_transcript_details`;
   const path = `/${index}/_search`;
-  const body = {
+  const queryBody = {
     query: {
       bool: {
         filter: [
@@ -41,17 +44,17 @@ export async function searchTranscripts(env, fromDate, toDate) {
       }
     }
   };
-  const opts = getAWSSignedRequest('POST', path, body);
-  const url = `${esEndpoint}${path}`;
+  // Use GET with source param for ESHttpGet permission
+  const query = {
+    source: JSON.stringify(queryBody),
+    source_content_type: 'application/json'
+  };
+  const opts = getAWSSignedRequest('GET', path, undefined, query);
+  const url = `${esEndpoint}${path}?${new URLSearchParams(query).toString()}`;
   const response = await axios({
-    method: 'post',
+    method: 'get',
     url,
-    headers: opts.headers,
-    data: body,
-    params: {},
-    transformRequest: [(data, headers) => {
-      return JSON.stringify(data);
-    }]
+    headers: opts.headers
   });
   return response.data.hits.hits;
 }

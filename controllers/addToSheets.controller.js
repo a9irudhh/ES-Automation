@@ -62,8 +62,9 @@ export async function addToSheetsController(req, res) {
     // console.log(`Processing date range: ${fromDate} to ${toDate}`);
 
     let hits;
+    const type = 'dev';  
     try {
-      hits = await searchTranscripts('dev', fromDate, toDate);
+      hits = await searchTranscripts(type, fromDate, toDate);
       // console.log(`Found ${hits.length} hits from Elasticsearch`);
       if (hits.length > 0) {
         // console.log('Sample data structure:', JSON.stringify(hits[0]._source, null, 2));
@@ -162,7 +163,7 @@ export async function addToSheetsController(req, res) {
 
         return [
           formattedDate,
-          h._source.original_filename || '',
+          h._source.image_name || '',
           h._source.request?.agent|| '',
           h._source.final_reviewer || '',
           h._source.processed_by  || '',
@@ -220,6 +221,10 @@ export async function addToSheetsController(req, res) {
 
     // Append new rows
     try {
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET,
+      });
       await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
         range: `${SHEET}!A1`,
