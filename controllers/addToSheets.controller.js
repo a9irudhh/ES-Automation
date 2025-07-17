@@ -65,7 +65,7 @@ export async function addToSheetsController(req, res) {
     const allowedAgents = ['sia-uttyler-prod', 'sia-msu-prod', 'sia-gvsu-prod'];
 
     let hits;
-    const type = 'dev';  
+    const type = 'production';  
     try {
       // Pass allowed agents to the search function to filter at the database level
       hits = await searchTranscripts(type, fromDate, toDate, allowedAgents);
