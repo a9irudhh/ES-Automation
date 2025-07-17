@@ -61,11 +61,15 @@ export async function addToSheetsController(req, res) {
 
     // console.log(`Processing date range: ${fromDate} to ${toDate}`);
 
+    // Define allowed agents
+    const allowedAgents = ['sia-uttyler-prod', 'sia-msu-prod', 'sia-gvsu-prod'];
+
     let hits;
     const type = 'dev';  
     try {
-      hits = await searchTranscripts(type, fromDate, toDate);
-      // console.log(`Found ${hits.length} hits from Elasticsearch`);
+      // Pass allowed agents to the search function to filter at the database level
+      hits = await searchTranscripts(type, fromDate, toDate, allowedAgents);
+      // console.log(`Found ${hits.length} hits from Elasticsearch with allowed agents: ${allowedAgents.join(', ')}`);
       if (hits.length > 0) {
         // console.log('Sample data structure:', JSON.stringify(hits[0]._source, null, 2));
       }
@@ -111,6 +115,7 @@ export async function addToSheetsController(req, res) {
       };
     }
 
+    // Since we're now filtering at the database level, we can work directly with hits
     const rows = hits
       .sort((a, b) => new Date(b._source.uploaded_date) - new Date(a._source.uploaded_date))
       .map((h) => {
@@ -180,7 +185,9 @@ export async function addToSheetsController(req, res) {
       });
 
     if (!rows.length) {
-      return res.status(404).json({ error: 'No results found to add to Google Sheets' });
+      return res.status(404).json({ 
+        error: 'No results found with the specified criteria. Make sure the date range contains data from allowed agents (sia-uttyler-prod, sia-msu-prod, sia-gvsu-prod).' 
+      });
     }
 
     let sheetsClient, sheets;
@@ -354,8 +361,8 @@ export async function addToSheetsController(req, res) {
     // console.log('User dominant shifts by date:', userDominantShiftByDate);
 
     res.json({
-      message: `${rows.length} recent rows added to Google Sheet`,
-      count: rows.length,
+      message: `${rows.length} rows added to Google Sheet`,
+      count: rows.length
     });
   } catch (err) {
     console.error('Error in addToSheetsController:', err);

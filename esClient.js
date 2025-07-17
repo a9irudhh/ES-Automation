@@ -47,16 +47,40 @@ async function getAWSSignedRequest(method, fullUrl, body = undefined) {
   };
 }
 
-export async function searchTranscripts(env, fromDate, toDate) {
+export async function searchTranscripts(env, fromDate, toDate, allowedAgents = null) {
   const index = `${env}_sia_transcript_details`;
+  
+  const filters = [
+    { range: { processed_on: { gte: fromDate, lte: toDate } } }
+  ];
+  
+  // Add agent filter if provided
+  if (allowedAgents && allowedAgents.length > 0) {
+    filters.push({
+      terms: { "request.agent": allowedAgents }
+    });
+  }
+  
   const queryBody = {
     query: {
       bool: {
-        filter: [
-          { range: { processed_on: { gte: fromDate, lte: toDate } } }
-        ]
+        filter: filters
       }
-    }
+    },
+    _source: [
+      "uploaded_date",
+      "original_filename", 
+      "request.agent",
+      "final_reviewer",
+      "processed_by",
+      "processed_on",
+      "reviewer_aht",
+      "validator_aht", 
+      "status",
+      "institution_name",
+      "pages",
+      "confidence_score"
+    ]
   };
   
   const fullUrl = `${esEndpoint}/${index}/_search`;
