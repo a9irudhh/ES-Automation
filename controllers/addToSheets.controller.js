@@ -35,7 +35,7 @@ const HEADERS      = [
 
 export async function addToSheetsController(req, res) {
   try {
-    // Get fromDate and toDate from frontend 
+    // Get fromDate and toDate from request body (POST request)
     const { fromDate, toDate } = req.body;
     
     if (!fromDate || !toDate) {

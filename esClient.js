@@ -1,40 +1,54 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
-// console.log('Loaded ES_ENDPOINT:', process.env.ES_ENDPOINT);
 
-import AWS from 'aws-sdk';
+import { SignatureV4 } from '@smithy/signature-v4';
+import { Sha256 } from '@aws-crypto/sha256-js';
 import axios from 'axios';
-import aws4 from 'aws4';
-
-AWS.config.update({ region: process.env.AWS_REGION });
 
 const esEndpoint = process.env.ES_ENDPOINT;
 
-function getAWSSignedRequest(method, path, body = undefined, query = undefined) {
-  const url = new URL(esEndpoint);
-  const opts = {
-    host: url.hostname,
-    path,
-    service: 'es',
-    region: process.env.AWS_REGION,
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined
-  };
-  if (query) {
-    opts.path += '?' + new URLSearchParams(query).toString();
-  }
-  aws4.sign(opts, {
+async function getAWSSignedRequest(method, fullUrl, body = undefined) {
+  const url = new URL(fullUrl);
+  
+  // Use environment variables directly for credentials
+  const credentials = {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    sessionToken: process.env.AWS_SESSION_TOKEN
+    sessionToken: process.env.AWS_SESSION_TOKEN,
+  };
+  
+  // Create signature v4 signer with proper SHA256 constructor
+  const signer = new SignatureV4({
+    credentials,
+    region: process.env.AWS_REGION,
+    service: 'es',
+    sha256: Sha256,
   });
-  return opts;
+
+  const request = {
+    method,
+    hostname: url.hostname,
+    path: url.pathname + url.search,
+    protocol: url.protocol,
+    headers: {
+      'Content-Type': 'application/json',
+      'host': url.hostname,
+    },
+  };
+
+  if (body) {
+    request.body = JSON.stringify(body);
+  }
+
+  const signedRequest = await signer.sign(request);
+  return {
+    url: fullUrl,
+    headers: signedRequest.headers
+  };
 }
 
 export async function searchTranscripts(env, fromDate, toDate) {
   const index = `${env}_sia_transcript_details`;
-  const path = `/${index}/_search`;
   const queryBody = {
     query: {
       bool: {
@@ -44,17 +58,17 @@ export async function searchTranscripts(env, fromDate, toDate) {
       }
     }
   };
-  // Use GET with source param for ESHttpGet permission
-  const query = {
-    source: JSON.stringify(queryBody),
-    source_content_type: 'application/json'
-  };
-  const opts = getAWSSignedRequest('GET', path, undefined, query);
-  const url = `${esEndpoint}${path}?${new URLSearchParams(query).toString()}`;
+  
+  const fullUrl = `${esEndpoint}/${index}/_search`;
+  
+  const { url, headers } = await getAWSSignedRequest('POST', fullUrl, queryBody);
+  
   const response = await axios({
-    method: 'get',
+    method: 'post',
     url,
-    headers: opts.headers
+    headers,
+    data: queryBody
   });
+  
   return response.data.hits.hits;
 }
