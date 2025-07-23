@@ -85,14 +85,63 @@ export async function searchTranscripts(env, fromDate, toDate, allowedAgents = n
   
   const fullUrl = `${esEndpoint}/${index}/_search`;
   
-  const { url, headers } = await getAWSSignedRequest('POST', fullUrl, queryBody);
+  try {
+    const { url, headers } = await getAWSSignedRequest('GET', fullUrl, queryBody);
+    
+    const response = await axios({
+      method: 'get',
+      url,
+      headers,
+      data: queryBody
+    });
+    
+    return response.data.hits.hits;
+  } catch (error) {
+    console.error('Elasticsearch request failed:', {
+      url: fullUrl,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message
+    });
+    
+    // Re-throw with more context
+    if (error.response?.status === 403) {
+      const awsError = error.response.data?.Message || error.response.data?.message || 'Access denied';
+      throw new Error(`AWS Elasticsearch Access Denied: ${awsError}. Please check your AWS credentials and IAM permissions.`);
+    }
+    
+    throw error;
+  }
+}
+
+// Validate AWS credentials
+export async function validateAWSCredentials() {
+  const requiredVars = ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'AWS_REGION'];
+  const missingVars = requiredVars.filter(varName => !process.env[varName]);
   
-  const response = await axios({
-    method: 'post',
-    url,
-    headers,
-    data: queryBody
-  });
+  if (missingVars.length > 0) {
+    throw new Error(`Missing required AWS environment variables: ${missingVars.join(', ')}`);
+  }
   
-  return response.data.hits.hits;
+  try {
+    const testUrl = `${esEndpoint}/_cluster/health`;
+    const { url, headers } = await getAWSSignedRequest('GET', testUrl);
+    
+    const response = await axios({
+      method: 'get',
+      url,
+      headers,
+      timeout: 10000
+    });
+    
+    return { valid: true, status: response.status };
+  } catch (error) {
+    console.error('AWS credentials validation failed:', error.response?.data);
+    return { 
+      valid: false, 
+      error: error.response?.data?.Message || error.message,
+      status: error.response?.status
+    };
+  }
 }

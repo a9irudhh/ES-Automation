@@ -139,7 +139,7 @@ pm2 save
 ## API Endpoints
 
 - `GET /api/search` - Search for transcript data
-- `POST /api/addToSheets` - Export data to Google Sheets
+- `GET /api/addToSheets` - Export data to Google Sheets
 - `GET /api/test-auth` - Test authentication
 
 ## Security Notes

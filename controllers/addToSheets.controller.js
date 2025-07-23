@@ -35,8 +35,14 @@ const HEADERS      = [
 
 export async function addToSheetsController(req, res) {
   try {
-    // Get fromDate and toDate from request body (POST request)
-    const { fromDate, toDate } = req.body;
+    // Debug: Log the entire request object parts
+    // console.log('Request query:', req.query);
+    // console.log('Request body:', req.body);
+    // console.log('Request method:', req.method);
+    
+    // Get fromDate and toDate from query parameters (GET request)
+    const { fromDate, toDate } = req.query;
+    // console.log(`Received request to add data from ${fromDate} to ${toDate}`);
     
     if (!fromDate || !toDate) {
       return res.status(400).json({ 
@@ -62,10 +68,10 @@ export async function addToSheetsController(req, res) {
     // console.log(`Processing date range: ${fromDate} to ${toDate}`);
 
     // Define allowed agents
-    const allowedAgents = ['sia-uttyler-prod', 'sia-msu-prod', 'sia-gvsu-prod'];
+    const allowedAgents = [];
 
     let hits;
-    const type = 'production';  
+    const type = 'dev';  
     try {
       // Pass allowed agents to the search function to filter at the database level
       hits = await searchTranscripts(type, fromDate, toDate, allowedAgents);
@@ -218,13 +224,7 @@ export async function addToSheetsController(req, res) {
         details: error.message 
       });
     }
-
-    const headerExists =
-      Array.isArray(data.values) &&
-      data.values.length > 0 &&
-      data.values[0].join() === HEADERS.join();
-
-    const values = headerExists ? rows : [HEADERS, ...rows];
+    const values = [HEADERS, ...rows];
 
     // Append new rows
     try {

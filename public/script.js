@@ -73,16 +73,16 @@ document.getElementById('exportForm').addEventListener('submit', async (e) => {
     messageDiv.style.display = 'none';
     
     try {
-        const response = await fetch(`${BASE_URL}/api/addToSheets`, {
-            method: 'POST',
+        const queryParams = new URLSearchParams({
+            fromDate: fromDateISO,
+            toDate: toDateISO
+        });
+        
+        const response = await fetch(`${BASE_URL}/api/addToSheets?${queryParams}`, {
+            method: 'GET',
             headers: {
-                'Content-Type': 'application/json',
                 'Authorization': `Basic ${authCredentials}`
-            },
-            body: JSON.stringify({
-                fromDate: fromDateISO,
-                toDate: toDateISO
-            })
+            }
         });
         
         const data = await response.json();
@@ -91,7 +91,19 @@ document.getElementById('exportForm').addEventListener('submit', async (e) => {
             messageDiv.className = 'success';
             messageDiv.textContent = data.message || 'Data exported successfully!';
         } else {
-            throw new Error(data.error || 'Export failed');
+            // Handle specific error cases
+            let errorMessage = data.error || 'Export failed';
+            if (data.details) {
+                if (data.details.includes('es:ESHttpGet') || data.details.includes('Access Denied')) {
+                    errorMessage += ' - AWS credentials may be expired or lack proper permissions. Please contact your administrator.';
+                } else {
+                    errorMessage += ` - ${data.details}`;
+                }
+            }
+            if (data.suggestion) {
+                errorMessage += ` ${data.suggestion}`;
+            }
+            throw new Error(errorMessage);
         }
     } catch (error) {
         messageDiv.className = 'error';
