@@ -6,7 +6,6 @@ const router = express.Router();
 
 router.route('/search').get(searchController);
 router.route('/addToSheets').get(addToSheetsController);
-
 // Test auth route for login validation
 router.route('/test-auth').get((req, res) => {
   res.json({ message: 'Authentication successful' });

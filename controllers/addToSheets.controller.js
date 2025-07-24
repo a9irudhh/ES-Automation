@@ -45,6 +45,7 @@ export async function addToSheetsController(req, res) {
     // console.log(`Received request to add data from ${fromDate} to ${toDate}`);
     
     if (!fromDate || !toDate) {
+      // console.log('Missing required parameters:', { fromDate, toDate });
       return res.status(400).json({ 
         error: 'Missing required fields: fromDate and toDate are required' 
       });
@@ -52,6 +53,15 @@ export async function addToSheetsController(req, res) {
 
     const fromDateObj = new Date(fromDate);
     const toDateObj = new Date(toDate);
+    // console.log('Parsed dates:', {
+    //   fromDate: fromDate,
+    //   toDate: toDate,
+    //   fromDateObj: fromDateObj.toISOString(),
+    //   toDateObj: toDateObj.toISOString(),
+    //   fromDateValid: !isNaN(fromDateObj.getTime()),
+    //   toDateValid: !isNaN(toDateObj.getTime())
+    // });
+    
     if (isNaN(fromDateObj.getTime()) || isNaN(toDateObj.getTime())) {
       return res.status(400).json({ 
         error: 'Invalid date format. Please provide valid ISO date strings' 
@@ -68,15 +78,51 @@ export async function addToSheetsController(req, res) {
     // console.log(`Processing date range: ${fromDate} to ${toDate}`);
     // Define allowed agents
     const allowedAgents = ['sia-uttyler-prod', 'sia-msu-prod', 'sia-gvsu-prod'];
-
+    // console.log('Allowed agents:', allowedAgents);
+    
     let hits;
     const type = 'production';
+    // console.log('Query type:', type);
+    
     try {
+      // console.log('Calling searchTranscripts with parameters:', {
+      //   type,
+      //   fromDate,
+      //   toDate,
+      //   allowedAgents
+      // });
+      
       // Pass allowed agents to the search function to filter at the database level
       hits = await searchTranscripts(type, fromDate, toDate, allowedAgents);
       // console.log(`Found ${hits.length} hits from Elasticsearch with allowed agents: ${allowedAgents.join(', ')}`);
+      
       if (hits.length > 0) {
         // console.log('Sample data structure:', JSON.stringify(hits[0]._source, null, 2));
+        
+        // Log agents found in the data
+        const agentsInData = hits.map(hit => hit._source.request?.agent).filter(Boolean);
+        const uniqueAgents = [...new Set(agentsInData)];
+        // console.log('Unique agents found in data:', uniqueAgents);
+        // console.log('Total agents in results:', agentsInData.length);
+        
+        // Log date range in the data
+        const dates = hits.map(hit => hit._source.uploaded_date || hit._source.processed_on).filter(Boolean);
+        if (dates.length > 0) {
+          const sortedDates = dates.sort();
+          // console.log('Date range in results:');
+          // console.log('  Earliest:', sortedDates[0]);
+          // console.log('  Latest:', sortedDates[sortedDates.length - 1]);
+        }
+        
+        // Count entries by agent
+        const agentCounts = {};
+        hits.forEach(hit => {
+          const agent = hit._source.request?.agent || 'unknown';
+          agentCounts[agent] = (agentCounts[agent] || 0) + 1;
+        });
+        // console.log('Entries count by agent:', agentCounts);
+      } else {
+        // console.log('No hits found. Checking if searchTranscripts returned empty results or if filtering is too restrictive');
       }
     } catch (error) {
       console.error('Error querying Elasticsearch:', error);
@@ -87,6 +133,16 @@ export async function addToSheetsController(req, res) {
     }
 
     // console.log(`Using ${hits.length} entries from Elasticsearch query`);
+
+    // Log some additional details about the data before processing
+    if (hits.length > 0) {
+      // console.log('First entry details:');
+      // console.log('  Agent:', hits[0]._source.request?.agent);
+      // console.log('  Upload date:', hits[0]._source.uploaded_date);
+      // console.log('  Processed on:', hits[0]._source.processed_on);
+      // console.log('  Status:', hits[0]._source.status);
+      // console.log('  Institution:', hits[0]._source.institution_name);
+    }
 
     // Helper function 
     function getShiftInfo(date) {
@@ -121,6 +177,8 @@ export async function addToSheetsController(req, res) {
     }
 
     // Since we're now filtering at the database level, we can work directly with hits
+    // console.log('Starting to process hits into rows...');
+    
     const rows = hits
       .sort((a, b) => new Date(b._source.uploaded_date) - new Date(a._source.uploaded_date))
       .map((h) => {
@@ -188,6 +246,12 @@ export async function addToSheetsController(req, res) {
           h._source.confidence_score || '',
         ];
       });
+
+    // console.log(`Processed ${rows.length} rows from ${hits.length} hits`);
+    
+    if (rows.length > 0) {
+      // console.log('Sample processed row:', rows[0]);
+    }
 
     if (!rows.length) {
       return res.status(404).json({ 

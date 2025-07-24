@@ -47,18 +47,27 @@ async function getAWSSignedRequest(method, fullUrl, body = undefined) {
   };
 }
 
-export async function searchTranscripts(env, fromDate, toDate, allowedAgents = null) {
+export async function searchTranscripts(env, fromDate, toDate, allowedAgents = null, agentField = "request.agent") {
   const index = `${env}_sia_transcript_details`;
+  // console.log(`Searching index: ${index} from ${fromDate} to ${toDate} for agents:`, allowedAgents);
   
   const filters = [
     { range: { processed_on: { gte: fromDate, lte: toDate } } }
   ];
   
+  // console.log('Base filter (date range):', JSON.stringify(filters[0], null, 2));
+  
   // Add agent filter if provided
   if (allowedAgents && allowedAgents.length > 0) {
-    filters.push({
-      terms: { "request.agent": allowedAgents }
-    });
+    // Try with .keyword suffix first for exact matching
+    const keywordField = agentField + '.keyword';
+    const agentFilter = {
+      terms: { [keywordField]: allowedAgents }
+    };
+    filters.push(agentFilter);
+    // console.log(`Added agent filter using field '${keywordField}':`, JSON.stringify(agentFilter, null, 2));
+  } else {
+    console.log('No agent filter applied - will search all agents');
   }
   
   const queryBody = {
@@ -80,8 +89,11 @@ export async function searchTranscripts(env, fromDate, toDate, allowedAgents = n
       "institution_name",
       "pages",
       "confidence_score"
-    ]
+    ],
+    size: 1000  // Increase the default size limit
   };
+  
+  // console.log('Complete Elasticsearch query:', JSON.stringify(queryBody, null, 2));
   
   const fullUrl = `${esEndpoint}/${index}/_search`;
   
@@ -93,7 +105,21 @@ export async function searchTranscripts(env, fromDate, toDate, allowedAgents = n
       url,
       headers,
       data: queryBody
-    });
+    });    
+    // console.log(`Elasticsearch response status: ${response.status}`);
+    // console.log(`Total hits found: ${response.data.hits.total?.value || response.data.hits.total}`);
+    // console.log(`Hits returned: ${response.data.hits.hits.length}`);
+    
+    if (response.data.hits.hits.length > 0) {
+      // console.log('Sample hit _source:', JSON.stringify(response.data.hits.hits[0]._source, null, 2));
+      
+      // Log all unique agents in the results
+      const agentsInResults = response.data.hits.hits
+        .map(hit => hit._source.request?.agent)
+        .filter(Boolean);
+      const uniqueAgentsInResults = [...new Set(agentsInResults)];
+      // console.log('Unique agents in results:', uniqueAgentsInResults);
+    }
     
     return response.data.hits.hits;
   } catch (error) {
@@ -110,6 +136,82 @@ export async function searchTranscripts(env, fromDate, toDate, allowedAgents = n
       const awsError = error.response.data?.Message || error.response.data?.message || 'Access denied';
       throw new Error(`AWS Elasticsearch Access Denied: ${awsError}. Please check your AWS credentials and IAM permissions.`);
     }
+    
+    throw error;
+  }
+}
+
+export async function countTranscriptsByAgent(env, fromDate, toDate, agents = null) {
+  const index = `${env}_sia_transcript_details`;
+  console.log(`Counting entries in index: ${index} from ${fromDate} to ${toDate} for agents:`, agents);
+  
+  const filters = [
+    { range: { processed_on: { gte: fromDate, lte: toDate } } }
+  ];
+  
+  // Add agent filter if provided
+  if (agents && agents.length > 0) {
+    filters.push({
+      terms: { "request.agent": agents }
+    });
+  }
+  
+  const queryBody = {
+    query: {
+      bool: {
+        filter: filters
+      }
+    },
+    aggs: {
+      agents: {
+        terms: {
+          field: "request.agent",
+          size: 100
+        }
+      }
+    },
+    size: 0  // We only want the aggregation, not the actual documents
+  };
+  
+  console.log('Count query:', JSON.stringify(queryBody, null, 2));
+  
+  const fullUrl = `${esEndpoint}/${index}/_search`;
+  
+  try {
+    const { url, headers } = await getAWSSignedRequest('GET', fullUrl, queryBody);
+    
+    const response = await axios({
+      method: 'get',
+      url,
+      headers,
+      data: queryBody
+    });
+
+    console.log(`Count response status: ${response.status}`);
+    console.log(`Total matching documents: ${response.data.hits.total?.value || response.data.hits.total}`);
+    
+    const agentBuckets = response.data.aggregations?.agents?.buckets || [];
+    const agentCounts = {};
+    
+    agentBuckets.forEach(bucket => {
+      agentCounts[bucket.key] = bucket.doc_count;
+    });
+    
+    console.log('Agent counts from aggregation:', agentCounts);
+    
+    return {
+      total: response.data.hits.total?.value || response.data.hits.total,
+      agentCounts: agentCounts
+    };
+    
+  } catch (error) {
+    console.error('Elasticsearch count request failed:', {
+      url: fullUrl,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message
+    });
     
     throw error;
   }
